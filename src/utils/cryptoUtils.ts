@@ -1,66 +1,77 @@
-
 // Crypto utilities for file encryption, chunking, and QR code generation
 
 export const encryptFile = async (file: File, password: string): Promise<string> => {
   console.log("Starting encryption process...");
   
-  // Convert file to ArrayBuffer
-  const fileBuffer = await file.arrayBuffer();
-  console.log("File converted to buffer, size:", fileBuffer.byteLength);
-  
-  // Create encryption key from password
-  const encoder = new TextEncoder();
-  const passwordData = encoder.encode(password);
-  
-  const key = await window.crypto.subtle.importKey(
-    'raw',
-    passwordData,
-    { name: 'PBKDF2' },
-    false,
-    ['deriveBits', 'deriveKey']
-  );
-  
-  // Generate salt
-  const salt = window.crypto.getRandomValues(new Uint8Array(16));
-  
-  // Derive AES key
-  const aesKey = await window.crypto.subtle.deriveKey(
-    {
-      name: 'PBKDF2',
-      salt: salt,
-      iterations: 100000,
-      hash: 'SHA-256',
-    },
-    key,
-    { name: 'AES-GCM', length: 256 },
-    false,
-    ['encrypt', 'decrypt']
-  );
-  
-  // Generate IV
-  const iv = window.crypto.getRandomValues(new Uint8Array(12));
-  
-  // Encrypt the file
-  const encryptedBuffer = await window.crypto.subtle.encrypt(
-    {
-      name: 'AES-GCM',
-      iv: iv,
-    },
-    aesKey,
-    fileBuffer
-  );
-  
-  // Combine salt, iv, and encrypted data
-  const resultBuffer = new Uint8Array(salt.length + iv.length + encryptedBuffer.byteLength);
-  resultBuffer.set(salt, 0);
-  resultBuffer.set(iv, salt.length);
-  resultBuffer.set(new Uint8Array(encryptedBuffer), salt.length + iv.length);
-  
-  // Convert to base64 for transmission
-  const base64String = btoa(String.fromCharCode(...resultBuffer));
-  console.log("Encryption complete, base64 length:", base64String.length);
-  
-  return base64String;
+  try {
+    // Convert file to ArrayBuffer
+    const fileBuffer = await file.arrayBuffer();
+    console.log("File converted to buffer, size:", fileBuffer.byteLength);
+    
+    // Create encryption key from password
+    const encoder = new TextEncoder();
+    const passwordData = encoder.encode(password);
+    console.log("Password encoded, length:", passwordData.length);
+    
+    const key = await window.crypto.subtle.importKey(
+      'raw',
+      passwordData,
+      { name: 'PBKDF2' },
+      false,
+      ['deriveBits', 'deriveKey']
+    );
+    console.log("Key imported successfully");
+    
+    // Generate salt
+    const salt = window.crypto.getRandomValues(new Uint8Array(16));
+    console.log("Salt generated, length:", salt.length);
+    
+    // Derive AES key
+    const aesKey = await window.crypto.subtle.deriveKey(
+      {
+        name: 'PBKDF2',
+        salt: salt,
+        iterations: 100000,
+        hash: 'SHA-256',
+      },
+      key,
+      { name: 'AES-GCM', length: 256 },
+      false,
+      ['encrypt', 'decrypt']
+    );
+    console.log("AES key derived successfully");
+    
+    // Generate IV
+    const iv = window.crypto.getRandomValues(new Uint8Array(12));
+    console.log("IV generated, length:", iv.length);
+    
+    // Encrypt the file
+    const encryptedBuffer = await window.crypto.subtle.encrypt(
+      {
+        name: 'AES-GCM',
+        iv: iv,
+      },
+      aesKey,
+      fileBuffer
+    );
+    console.log("File encrypted, encrypted buffer size:", encryptedBuffer.byteLength);
+    
+    // Combine salt, iv, and encrypted data
+    const resultBuffer = new Uint8Array(salt.length + iv.length + encryptedBuffer.byteLength);
+    resultBuffer.set(salt, 0);
+    resultBuffer.set(iv, salt.length);
+    resultBuffer.set(new Uint8Array(encryptedBuffer), salt.length + iv.length);
+    console.log("Result buffer created, total size:", resultBuffer.length);
+    
+    // Convert to base64 for transmission
+    const base64String = btoa(String.fromCharCode(...resultBuffer));
+    console.log("Encryption complete, base64 length:", base64String.length);
+    
+    return base64String;
+  } catch (error) {
+    console.error("Encryption error details:", error);
+    throw new Error(`Encryption failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
 };
 
 export const decryptFile = async (encryptedData: string, password: string, filename: string): Promise<File> => {

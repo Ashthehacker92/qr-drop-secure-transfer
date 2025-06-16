@@ -50,6 +50,9 @@ const SenderMode = ({ onBack }: SenderModeProps) => {
     
     try {
       console.log("Starting file encryption...");
+      console.log("File details:", { name: file.name, size: file.size, type: file.type });
+      console.log("Password length:", password.length);
+      
       const encryptedData = await encryptFile(file, password);
       console.log("File encrypted, data length:", encryptedData.length);
       
@@ -81,9 +84,10 @@ const SenderMode = ({ onBack }: SenderModeProps) => {
       });
     } catch (error) {
       console.error("Error processing file:", error);
+      const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
       toast({
         title: "Processing Error",
-        description: "Failed to encrypt and chunk file",
+        description: `Failed to encrypt and chunk file: ${errorMessage}`,
         variant: "destructive",
       });
     } finally {
