@@ -1,3 +1,4 @@
+
 import { useState, useRef } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import QRDisplay from "./QRDisplay";
-import { encryptFile, chunkFile } from "@/utils/cryptoUtils";
+import { processFileAsync } from "@/utils/cryptoUtils";
 
 interface SenderModeProps {
   onBack: () => void;
@@ -20,6 +21,8 @@ const SenderMode = ({ onBack }: SenderModeProps) => {
   const [qrCodes, setQrCodes] = useState<string[]>([]);
   const [currentQR, setCurrentQR] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [processingProgress, setProcessingProgress] = useState(0);
+  const [processingStep, setProcessingStep] = useState("");
   const [transmissionStarted, setTransmissionStarted] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
@@ -47,30 +50,26 @@ const SenderMode = ({ onBack }: SenderModeProps) => {
     }
 
     setIsProcessing(true);
+    setProcessingProgress(0);
+    setProcessingStep("Starting...");
     
     try {
-      console.log("Starting file encryption...");
+      console.log("Starting async file processing...");
       console.log("File details:", { name: file.name, size: file.size, type: file.type });
       console.log("Password length:", password.length);
+      console.log("Chunk size:", chunkSize, "KB");
       
-      const encryptedData = await encryptFile(file, password);
-      console.log("File encrypted, data length:", encryptedData.length);
-      
-      const chunks = chunkFile(encryptedData, parseInt(chunkSize) * 1024);
-      console.log(`Created ${chunks.length} chunks`);
-      
-      // Convert chunks to QR codes (base64 encoded)
-      const qrData = chunks.map((chunk, index) => {
-        const metadata = {
-          index,
-          total: chunks.length,
-          filename: file.name,
-          size: file.size,
-        };
-        const qrContent = JSON.stringify({ metadata, data: chunk });
-        console.log(`QR ${index + 1} content length:`, qrContent.length);
-        return qrContent;
-      });
+      // Use the new async processing function with progress tracking
+      const qrData = await processFileAsync(
+        file,
+        password,
+        parseInt(chunkSize),
+        (step: string, progress: number) => {
+          console.log(`Processing: ${step} - ${progress}%`);
+          setProcessingStep(step);
+          setProcessingProgress(progress);
+        }
+      );
       
       console.log("QR data array created with", qrData.length, "items");
       
@@ -80,18 +79,20 @@ const SenderMode = ({ onBack }: SenderModeProps) => {
       
       toast({
         title: "File Processed",
-        description: `Ready to transmit ${chunks.length} QR codes`,
+        description: `Ready to transmit ${qrData.length} QR codes`,
       });
     } catch (error) {
       console.error("Error processing file:", error);
       const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
       toast({
         title: "Processing Error",
-        description: `Failed to encrypt and chunk file: ${errorMessage}`,
+        description: `Failed to process file: ${errorMessage}`,
         variant: "destructive",
       });
     } finally {
       setIsProcessing(false);
+      setProcessingProgress(0);
+      setProcessingStep("");
     }
   };
 
@@ -117,6 +118,8 @@ const SenderMode = ({ onBack }: SenderModeProps) => {
     setQrCodes([]);
     setCurrentQR(0);
     setTransmissionStarted(false);
+    setProcessingProgress(0);
+    setProcessingStep("");
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -227,8 +230,13 @@ const SenderMode = ({ onBack }: SenderModeProps) => {
 
             {isProcessing && (
               <div className="space-y-2">
-                <div className="text-sm font-mono text-matrix-green">Processing file...</div>
-                <Progress value={50} className="w-full" />
+                <div className="text-sm font-mono text-matrix-green">
+                  {processingStep || "Processing file..."}
+                </div>
+                <Progress value={processingProgress} className="w-full" />
+                <div className="text-xs font-mono text-muted-foreground">
+                  {processingProgress.toFixed(0)}% complete
+                </div>
               </div>
             )}
           </div>
