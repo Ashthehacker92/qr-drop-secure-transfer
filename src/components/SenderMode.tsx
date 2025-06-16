@@ -1,4 +1,3 @@
-
 import { useState, useRef } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,7 +16,7 @@ interface SenderModeProps {
 const SenderMode = ({ onBack }: SenderModeProps) => {
   const [file, setFile] = useState<File | null>(null);
   const [password, setPassword] = useState("");
-  const [chunkSize, setChunkSize] = useState("512");
+  const [chunkSize, setChunkSize] = useState("64"); // Reduced default chunk size
   const [qrCodes, setQrCodes] = useState<string[]>([]);
   const [currentQR, setCurrentQR] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -72,6 +71,7 @@ const SenderMode = ({ onBack }: SenderModeProps) => {
       );
       
       console.log("QR data array created with", qrData.length, "items");
+      console.log("First QR data sample length:", qrData[0]?.length || 0);
       
       setQrCodes(qrData);
       setCurrentQR(0);
@@ -213,9 +213,9 @@ const SenderMode = ({ onBack }: SenderModeProps) => {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="256">256 KB</SelectItem>
-                  <SelectItem value="512">512 KB</SelectItem>
-                  <SelectItem value="1024">1 MB</SelectItem>
+                  <SelectItem value="32">32 KB (More QR codes, smaller size)</SelectItem>
+                  <SelectItem value="64">64 KB (Recommended)</SelectItem>
+                  <SelectItem value="128">128 KB (Fewer QR codes, larger size)</SelectItem>
                 </SelectContent>
               </Select>
             </div>

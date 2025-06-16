@@ -18,14 +18,17 @@ const QRDisplay = ({ data, currentIndex, total, filename, onNext, onPrev }: QRDi
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
-    console.log("QRDisplay useEffect triggered with data:", data ? "Data present" : "No data");
+    console.log("QRDisplay useEffect triggered for chunk", currentIndex + 1);
+    console.log("Data length:", data?.length || 0, "characters");
     
     if (canvasRef.current && data) {
-      console.log("Generating QR code for chunk", currentIndex + 1);
+      console.log("Generating QR code for chunk", currentIndex + 1, "with", data.length, "characters");
       
+      // Use lower error correction and smaller modules for larger data capacity
       QRCode.toCanvas(canvasRef.current, data, {
         width: 400,
         margin: 2,
+        errorCorrectionLevel: 'L', // Low error correction for maximum data capacity
         color: {
           dark: '#00ff41',
           light: '#000000'
@@ -33,12 +36,31 @@ const QRDisplay = ({ data, currentIndex, total, filename, onNext, onPrev }: QRDi
       }).then(() => {
         console.log("QR code generated successfully for chunk", currentIndex + 1);
       }).catch((error) => {
-        console.error('QR Code generation error:', error);
+        console.error('QR Code generation error for chunk', currentIndex + 1, ':', error);
+        console.error('Data length was:', data.length, 'characters');
+        
+        // Try with even more aggressive settings
+        if (data.length > 1500) {
+          console.log("Data too large, trying with medium error correction...");
+          QRCode.toCanvas(canvasRef.current!, data, {
+            width: 300,
+            margin: 1,
+            errorCorrectionLevel: 'L',
+            version: 40, // Maximum version
+            color: {
+              dark: '#00ff41',
+              light: '#000000'
+            }
+          }).catch((secondError) => {
+            console.error('Second attempt failed:', secondError);
+          });
+        }
       });
     } else {
       console.log("Cannot generate QR: canvas or data missing", {
         canvas: !!canvasRef.current,
-        data: !!data
+        data: !!data,
+        dataLength: data?.length || 0
       });
     }
   }, [data, currentIndex]);
@@ -55,6 +77,9 @@ const QRDisplay = ({ data, currentIndex, total, filename, onNext, onPrev }: QRDi
             </h3>
             <div className="text-sm font-mono text-muted-foreground">
               QR CODE {currentIndex + 1} OF {total}
+            </div>
+            <div className="text-xs font-mono text-muted-foreground mt-1">
+              Data size: {data?.length || 0} characters
             </div>
             <Progress value={progress} className="w-full mt-2" />
           </div>

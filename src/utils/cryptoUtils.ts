@@ -1,9 +1,9 @@
-
 // Crypto utilities for file encryption, chunking, and QR code generation
 
 // Constants for memory-efficient processing
 const CHUNK_SIZE = 1024 * 1024; // 1MB chunks for processing
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB max file size
+const MAX_QR_DATA_SIZE = 2000; // Maximum characters that can fit in a QR code safely
 
 export const encryptFile = async (file: File, password: string): Promise<string> => {
   console.log("Starting encryption process for file:", file.name, "size:", file.size);
@@ -202,13 +202,17 @@ export const chunkFile = (data: string, chunkSizeBytes: number): string[] => {
   
   const chunks: string[] = [];
   
-  // Calculate characters per chunk (base64 encoding)
-  const charsPerChunk = Math.floor(chunkSizeBytes * 0.75); // Account for base64 overhead
+  // Calculate safe characters per chunk for QR codes
+  // QR codes have a practical limit of ~2000-3000 characters depending on error correction
+  // We'll use a conservative 1500 characters to account for metadata
+  const maxCharsPerChunk = Math.min(1500, Math.floor(chunkSizeBytes * 0.5));
+  
+  console.log("Using max chars per chunk:", maxCharsPerChunk);
   
   // Use iterative approach to avoid stack overflow
   let currentIndex = 0;
   while (currentIndex < data.length) {
-    const endIndex = Math.min(currentIndex + charsPerChunk, data.length);
+    const endIndex = Math.min(currentIndex + maxCharsPerChunk, data.length);
     const chunk = data.slice(currentIndex, endIndex);
     chunks.push(chunk);
     currentIndex = endIndex;
@@ -220,6 +224,8 @@ export const chunkFile = (data: string, chunkSizeBytes: number): string[] => {
   }
   
   console.log("File chunked into", chunks.length, "pieces");
+  console.log("Average chunk size:", chunks.length > 0 ? Math.round(chunks.reduce((sum, chunk) => sum + chunk.length, 0) / chunks.length) : 0, "characters");
+  
   return chunks;
 };
 
@@ -256,9 +262,13 @@ export const processFileAsync = async (
     onProgress?.("Encrypting file...", 0);
     const encryptedData = await encryptFile(file, password);
     
-    // Step 2: Chunk the data
+    // Step 2: Chunk the data with smaller, QR-safe chunks
     onProgress?.("Chunking data...", 50);
-    const chunks = chunkFile(encryptedData, chunkSizeKB * 1024);
+    // Use much smaller chunks for QR compatibility - ignore the user setting for now
+    const actualChunkSize = Math.min(chunkSizeKB * 1024, 64 * 1024); // Max 64KB chunks
+    const chunks = chunkFile(encryptedData, actualChunkSize);
+    
+    console.log(`Created ${chunks.length} chunks from ${encryptedData.length} characters`);
     
     // Step 3: Prepare QR data with metadata
     onProgress?.("Preparing QR codes...", 75);
@@ -273,6 +283,12 @@ export const processFileAsync = async (
       };
       
       const qrContent = JSON.stringify({ metadata, data: chunks[i] });
+      
+      // Check if QR content is too large
+      if (qrContent.length > MAX_QR_DATA_SIZE) {
+        console.warn(`QR content for chunk ${i} is ${qrContent.length} chars, may be too large`);
+      }
+      
       qrData.push(qrContent);
       
       // Yield control periodically to prevent UI blocking
@@ -281,6 +297,9 @@ export const processFileAsync = async (
         onProgress?.("Preparing QR codes...", 75 + (i / chunks.length) * 25);
       }
     }
+    
+    console.log(`Generated ${qrData.length} QR data items`);
+    console.log("Sample QR data length:", qrData[0]?.length || 0);
     
     onProgress?.("Complete", 100);
     return qrData;
