@@ -1,4 +1,3 @@
-
 import { useState, useRef } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -29,6 +28,7 @@ const SenderMode = ({ onBack }: SenderModeProps) => {
     const selectedFile = event.target.files?.[0];
     if (selectedFile) {
       setFile(selectedFile);
+      console.log("File selected:", selectedFile.name, selectedFile.size);
       toast({
         title: "File Selected",
         description: `${selectedFile.name} (${(selectedFile.size / 1024 / 1024).toFixed(2)} MB)`,
@@ -51,7 +51,7 @@ const SenderMode = ({ onBack }: SenderModeProps) => {
     try {
       console.log("Starting file encryption...");
       const encryptedData = await encryptFile(file, password);
-      console.log("File encrypted, creating chunks...");
+      console.log("File encrypted, data length:", encryptedData.length);
       
       const chunks = chunkFile(encryptedData, parseInt(chunkSize) * 1024);
       console.log(`Created ${chunks.length} chunks`);
@@ -64,8 +64,12 @@ const SenderMode = ({ onBack }: SenderModeProps) => {
           filename: file.name,
           size: file.size,
         };
-        return JSON.stringify({ metadata, data: chunk });
+        const qrContent = JSON.stringify({ metadata, data: chunk });
+        console.log(`QR ${index + 1} content length:`, qrContent.length);
+        return qrContent;
       });
+      
+      console.log("QR data array created with", qrData.length, "items");
       
       setQrCodes(qrData);
       setCurrentQR(0);
@@ -89,13 +93,17 @@ const SenderMode = ({ onBack }: SenderModeProps) => {
 
   const nextQR = () => {
     if (currentQR < qrCodes.length - 1) {
-      setCurrentQR(currentQR + 1);
+      const newIndex = currentQR + 1;
+      console.log("Moving to QR", newIndex + 1);
+      setCurrentQR(newIndex);
     }
   };
 
   const prevQR = () => {
     if (currentQR > 0) {
-      setCurrentQR(currentQR - 1);
+      const newIndex = currentQR - 1;
+      console.log("Moving to QR", newIndex + 1);
+      setCurrentQR(newIndex);
     }
   };
 
@@ -111,6 +119,8 @@ const SenderMode = ({ onBack }: SenderModeProps) => {
   };
 
   if (transmissionStarted && qrCodes.length > 0) {
+    console.log("Rendering QR display with", qrCodes.length, "QR codes, current:", currentQR);
+    
     return (
       <div className="min-h-screen bg-background terminal-grid p-4">
         <div className="max-w-4xl mx-auto">

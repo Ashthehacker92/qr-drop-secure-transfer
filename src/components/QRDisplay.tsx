@@ -18,7 +18,11 @@ const QRDisplay = ({ data, currentIndex, total, filename, onNext, onPrev }: QRDi
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
+    console.log("QRDisplay useEffect triggered with data:", data ? "Data present" : "No data");
+    
     if (canvasRef.current && data) {
+      console.log("Generating QR code for chunk", currentIndex + 1);
+      
       QRCode.toCanvas(canvasRef.current, data, {
         width: 400,
         margin: 2,
@@ -26,11 +30,18 @@ const QRDisplay = ({ data, currentIndex, total, filename, onNext, onPrev }: QRDi
           dark: '#00ff41',
           light: '#000000'
         }
-      }, (error) => {
-        if (error) console.error('QR Code generation error:', error);
+      }).then(() => {
+        console.log("QR code generated successfully for chunk", currentIndex + 1);
+      }).catch((error) => {
+        console.error('QR Code generation error:', error);
+      });
+    } else {
+      console.log("Cannot generate QR: canvas or data missing", {
+        canvas: !!canvasRef.current,
+        data: !!data
       });
     }
-  }, [data]);
+  }, [data, currentIndex]);
 
   const progress = ((currentIndex + 1) / total) * 100;
 
