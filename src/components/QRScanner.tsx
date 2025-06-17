@@ -64,6 +64,7 @@ const QRScanner = ({ onQRDetected }: QRScannerProps) => {
   const startCamera = async () => {
     setIsLoading(true);
     setError(null);
+    console.log("Starting camera...");
 
     // Check if running on secure context
     if (!window.isSecureContext) {
@@ -92,7 +93,7 @@ const QRScanner = ({ onQRDetected }: QRScannerProps) => {
     }
 
     try {
-      console.log("Requesting camera access with constraints:", getCameraConstraints());
+      console.log("Requesting camera access...");
       
       let mediaStream;
       try {
@@ -101,9 +102,17 @@ const QRScanner = ({ onQRDetected }: QRScannerProps) => {
       } catch (constraintError) {
         console.warn("Failed with preferred constraints, trying basic:", constraintError);
         // Fallback to basic constraints
-        mediaStream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'environment' }
-        });
+        try {
+          mediaStream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: 'environment' }
+          });
+        } catch (basicError) {
+          console.warn("Failed with environment camera, trying any camera:", basicError);
+          // Final fallback to any camera
+          mediaStream = await navigator.mediaDevices.getUserMedia({
+            video: true
+          });
+        }
       }
       
       if (videoRef.current) {
@@ -133,6 +142,11 @@ const QRScanner = ({ onQRDetected }: QRScannerProps) => {
           console.error("Video element error:", e);
           handleCameraError(new Error("Video playback error"));
         };
+
+        // Force video to play
+        videoRef.current.play().catch(e => {
+          console.error("Play failed:", e);
+        });
       }
     } catch (error) {
       handleCameraError(error);
@@ -215,7 +229,11 @@ const QRScanner = ({ onQRDetected }: QRScannerProps) => {
     }, 500);
   };
 
+  // Auto-start camera when component mounts
   useEffect(() => {
+    console.log("QRScanner mounted, auto-starting camera...");
+    startCamera();
+    
     return () => {
       stopCamera();
     };

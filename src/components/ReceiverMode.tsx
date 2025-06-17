@@ -178,6 +178,11 @@ const ReceiverMode = ({ onBack }: ReceiverModeProps) => {
     setPassword("");
   };
 
+  const startScanning = () => {
+    console.log("Starting scanning mode...");
+    setScanningStarted(true);
+  };
+
   if (scanningStarted) {
     return (
       <div className="min-h-screen bg-background terminal-grid p-4">
@@ -306,7 +311,7 @@ const ReceiverMode = ({ onBack }: ReceiverModeProps) => {
             </div>
 
             <Button
-              onClick={() => setScanningStarted(true)}
+              onClick={startScanning}
               className="w-full bg-matrix-green text-black hover:bg-matrix-green-dark font-mono font-semibold"
             >
               START CAMERA SCANNING
