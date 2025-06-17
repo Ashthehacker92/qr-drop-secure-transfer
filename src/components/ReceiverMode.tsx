@@ -1,10 +1,11 @@
 
-import { useState, useRef, useEffect } from "react";
+import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import QRScanner from "./QRScanner";
 import { decryptFile, reconstructFile } from "@/utils/cryptoUtils";
@@ -33,25 +34,49 @@ const ReceiverMode = ({ onBack }: ReceiverModeProps) => {
   const { toast } = useToast();
 
   const handleQRDetected = (data: string) => {
+    console.log("QR data received, length:", data.length);
+    console.log("QR data preview:", data.substring(0, 100) + "...");
+    
     try {
       const parsed: QRChunk = JSON.parse(data);
+      console.log("Parsed QR chunk:", parsed.metadata);
+      
       const { metadata } = parsed;
+
+      // Validate the chunk structure
+      if (!metadata || typeof metadata.index !== 'number' || typeof metadata.total !== 'number') {
+        throw new Error("Invalid QR chunk structure");
+      }
 
       // Set total chunks and filename from first scan
       if (totalChunks === 0) {
         setTotalChunks(metadata.total);
         setFilename(metadata.filename);
+        console.log("Initialized reception:", metadata.filename, "with", metadata.total, "chunks");
+      }
+
+      // Verify this chunk belongs to the same file
+      if (filename && metadata.filename !== filename) {
+        toast({
+          title: "Wrong File",
+          description: `Expected ${filename}, got ${metadata.filename}`,
+          variant: "destructive",
+        });
+        return;
       }
 
       // Check if this chunk is already received
       if (chunks.has(metadata.index)) {
-        return; // Already have this chunk
+        console.log("Chunk", metadata.index + 1, "already received, skipping");
+        return;
       }
 
       // Add the new chunk
       const newChunks = new Map(chunks);
       newChunks.set(metadata.index, parsed);
       setChunks(newChunks);
+
+      console.log("Added chunk", metadata.index + 1, "of", metadata.total);
 
       toast({
         title: "QR Code Scanned",
@@ -67,6 +92,8 @@ const ReceiverMode = ({ onBack }: ReceiverModeProps) => {
       }
     } catch (error) {
       console.error("Error parsing QR data:", error);
+      console.error("Raw QR data was:", data.substring(0, 200));
+      
       toast({
         title: "Invalid QR Code",
         description: "This QR code is not part of a Dead Drop transmission",
@@ -179,6 +206,14 @@ const ReceiverMode = ({ onBack }: ReceiverModeProps) => {
             <Card className="p-6 border-matrix-green/20 bg-card/50 backdrop-blur-sm">
               <h3 className="text-lg font-mono font-semibold matrix-text mb-4">RECEPTION STATUS</h3>
               
+              {!window.isSecureContext && (
+                <Alert variant="destructive" className="mb-4">
+                  <AlertDescription className="font-mono text-sm">
+                    ⚠️ Camera requires HTTPS or localhost. Please use a secure connection.
+                  </AlertDescription>
+                </Alert>
+              )}
+              
               {totalChunks > 0 && (
                 <div className="space-y-4">
                   <div>
@@ -194,6 +229,16 @@ const ReceiverMode = ({ onBack }: ReceiverModeProps) => {
                       value={(chunks.size / totalChunks) * 100} 
                       className="w-full"
                     />
+                    
+                    {/* Show which chunks are missing */}
+                    {chunks.size < totalChunks && (
+                      <div className="text-xs font-mono text-muted-foreground mt-2">
+                        Missing chunks: {Array.from({ length: totalChunks }, (_, i) => i)
+                          .filter(i => !chunks.has(i))
+                          .map(i => i + 1)
+                          .join(', ')}
+                      </div>
+                    )}
                   </div>
 
                   <div>
