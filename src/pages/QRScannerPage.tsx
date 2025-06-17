@@ -58,19 +58,32 @@ const QRScannerPage = () => {
     }
 
     try {
-      const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { 
-          facingMode: { ideal: 'environment' },
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
-        }
-      });
+      console.log("Requesting camera access...");
+      
+      // Try with basic constraints first, then fallback to even simpler ones
+      let mediaStream;
+      try {
+        mediaStream = await navigator.mediaDevices.getUserMedia({
+          video: { 
+            facingMode: 'environment',
+            width: { ideal: 640 },
+            height: { ideal: 480 }
+          }
+        });
+      } catch (constraintError) {
+        console.warn("Trying with simpler constraints:", constraintError);
+        // Fallback to most basic constraints
+        mediaStream = await navigator.mediaDevices.getUserMedia({
+          video: true
+        });
+      }
 
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;
         setStream(mediaStream);
         
         videoRef.current.onloadedmetadata = () => {
+          console.log("Video loaded, starting scan");
           setIsScanning(true);
           setIsProcessing(false);
           
@@ -78,23 +91,37 @@ const QRScannerPage = () => {
           if (scanIntervalRef.current) {
             clearInterval(scanIntervalRef.current);
           }
-          scanIntervalRef.current = setInterval(scanForQR, 200);
+          scanIntervalRef.current = setInterval(scanForQR, 300);
           
           toast({
             title: "Camera Started",
             description: "Point camera at QR codes to scan",
           });
         };
+
+        videoRef.current.onerror = (e) => {
+          console.error("Video error:", e);
+          setError("Video playback failed");
+          setIsProcessing(false);
+        };
+
+        // Force video to play
+        videoRef.current.play().catch(e => {
+          console.error("Play failed:", e);
+        });
       }
     } catch (error: any) {
+      console.error("Camera error:", error);
       let errorMessage = "Camera access failed";
       
       if (error.name === 'NotAllowedError') {
-        errorMessage = "Camera permission denied";
+        errorMessage = "Camera permission denied. Please allow camera access.";
       } else if (error.name === 'NotFoundError') {
-        errorMessage = "No camera found";
+        errorMessage = "No camera found on this device.";
       } else if (error.name === 'NotReadableError') {
-        errorMessage = "Camera already in use";
+        errorMessage = "Camera is already in use by another app.";
+      } else if (error.name === 'OverconstrainedError') {
+        errorMessage = "Camera settings not supported.";
       }
 
       setError(errorMessage);
@@ -108,8 +135,13 @@ const QRScannerPage = () => {
   };
 
   const stopCamera = () => {
+    console.log("Stopping camera");
+    
     if (stream) {
-      stream.getTracks().forEach(track => track.stop());
+      stream.getTracks().forEach(track => {
+        console.log("Stopping track:", track.kind);
+        track.stop();
+      });
       setStream(null);
     }
     
@@ -242,7 +274,17 @@ const QRScannerPage = () => {
     setError(null);
   };
 
+  const retryCamera = () => {
+    stopCamera();
+    setTimeout(() => {
+      startCamera();
+    }, 1000);
+  };
+
+  // Auto-start camera when component mounts
   useEffect(() => {
+    startCamera();
+    
     return () => {
       stopCamera();
     };
@@ -294,6 +336,11 @@ const QRScannerPage = () => {
                     <div className="text-sm font-mono text-muted-foreground">
                       {isProcessing ? "Starting camera..." : "Camera inactive"}
                     </div>
+                    {error && (
+                      <div className="text-xs font-mono text-red-400">
+                        {error}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -301,18 +348,30 @@ const QRScannerPage = () => {
 
             <canvas ref={canvasRef} className="hidden" />
 
-            <Button
-              onClick={isScanning ? stopCamera : startCamera}
-              disabled={isProcessing}
-              className={`w-full font-mono font-semibold ${
-                isScanning 
-                  ? "bg-red-600 hover:bg-red-700 text-white" 
-                  : "bg-matrix-green text-black hover:bg-matrix-green-dark"
-              }`}
-            >
-              <Camera className="w-4 h-4 mr-2" />
-              {isProcessing ? "STARTING..." : isScanning ? "STOP CAMERA" : "START CAMERA"}
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                onClick={isScanning ? stopCamera : startCamera}
+                disabled={isProcessing}
+                className={`flex-1 font-mono font-semibold ${
+                  isScanning 
+                    ? "bg-red-600 hover:bg-red-700 text-white" 
+                    : "bg-matrix-green text-black hover:bg-matrix-green-dark"
+                }`}
+              >
+                <Camera className="w-4 h-4 mr-2" />
+                {isProcessing ? "STARTING..." : isScanning ? "STOP CAMERA" : "START CAMERA"}
+              </Button>
+              
+              {error && (
+                <Button
+                  onClick={retryCamera}
+                  variant="outline"
+                  className="border-matrix-green/50 text-matrix-green hover:bg-matrix-green/10 font-mono"
+                >
+                  RETRY
+                </Button>
+              )}
+            </div>
           </Card>
 
           {/* Image Upload */}
