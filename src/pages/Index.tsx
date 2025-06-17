@@ -2,11 +2,13 @@
 import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { useNavigate } from "react-router-dom";
 import SenderMode from "@/components/SenderMode";
 import ReceiverMode from "@/components/ReceiverMode";
 
 const Index = () => {
   const [mode, setMode] = useState<'select' | 'sender' | 'receiver'>('select');
+  const navigate = useNavigate();
 
   if (mode === 'sender') {
     return <SenderMode onBack={() => setMode('select')} />;
@@ -31,7 +33,7 @@ const Index = () => {
         </div>
 
         {/* Mode Selection */}
-        <div className="grid md:grid-cols-2 gap-8 max-w-2xl mx-auto">
+        <div className="grid md:grid-cols-2 gap-8 max-w-2xl mx-auto mb-8">
           <Card className="p-8 border-matrix-green/20 bg-card/50 backdrop-blur-sm hover:border-matrix-green/40 transition-all duration-300 scanline">
             <div className="text-center space-y-4">
               <div className="w-16 h-16 mx-auto bg-matrix-green/10 rounded-lg flex items-center justify-center">
@@ -67,6 +69,17 @@ const Index = () => {
               </Button>
             </div>
           </Card>
+        </div>
+
+        {/* Quick Scanner Access */}
+        <div className="text-center mb-8">
+          <Button 
+            onClick={() => navigate('/scanner')}
+            variant="outline" 
+            className="border-matrix-green/50 text-matrix-green hover:bg-matrix-green/10 font-mono"
+          >
+            🔍 QUICK QR SCANNER
+          </Button>
         </div>
 
         {/* Features */}
